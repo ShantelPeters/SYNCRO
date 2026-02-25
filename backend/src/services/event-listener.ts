@@ -133,7 +133,6 @@ export class EventListener {
       ApprovalRejected: this.handleApprovalRejected.bind(this),
       ExecutorAssigned: this.handleExecutorAssigned.bind(this),
       ExecutorRemoved: this.handleExecutorRemoved.bind(this),
-      WindowUpdated: this.handleWindowUpdated.bind(this),
     };
 
     return handlers[eventType];
@@ -287,26 +286,6 @@ export class EventListener {
     return {
       sub_id,
       event_type: 'executor_removed',
-      ledger: event.ledger,
-      tx_hash: event.txHash,
-      event_data: event.value,
-    };
-  }
-
-  private async handleWindowUpdated(event: ContractEvent): Promise<ProcessedEvent | null> {
-    const { sub_id, billing_start, billing_end } = event.value;
-    
-    await supabase
-      .from('subscriptions')
-      .update({ 
-        billing_start_timestamp: new Date(billing_start * 1000).toISOString(),
-        billing_end_timestamp: new Date(billing_end * 1000).toISOString(),
-      })
-      .eq('blockchain_sub_id', sub_id);
-
-    return {
-      sub_id,
-      event_type: 'window_updated',
       ledger: event.ledger,
       tx_hash: event.txHash,
       event_data: event.value,
