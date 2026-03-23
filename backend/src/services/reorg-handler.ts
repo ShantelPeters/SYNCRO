@@ -1,5 +1,6 @@
 import logger from '../config/logger';
 import { supabase } from '../config/database';
+import { LIFECYCLE_COLUMN_MAP } from './event-listener';
 
 export class ReorgHandler {
   private reorgDepth: number = 10; // Safety margin for reorgs
@@ -51,8 +52,12 @@ export class ReorgHandler {
       case 'renewal_success':
         await supabase
           .from('subscriptions')
-          .update({ status: 'pending' })
+          .update({ status: 'pending', last_renewal_cycle_id: null })
           .eq('blockchain_sub_id', sub_id);
+        break;
+
+      case 'duplicate_renewal_rejected':
+        // No-op: rejection didn't change state, rollback is a no-op
         break;
 
       case 'state_transition':
@@ -80,6 +85,16 @@ export class ReorgHandler {
           .delete()
           .eq('blockchain_sub_id', sub_id)
           .eq('approval_id', event.event_data.approval_id);
+        break;
+
+      case 'lifecycle_timestamp_updated':
+        const col = LIFECYCLE_COLUMN_MAP[event.event_data?.event_kind];
+        if (col) {
+          await supabase
+            .from('subscriptions')
+            .update({ [col]: null })
+            .eq('blockchain_sub_id', sub_id);
+        }
         break;
     }
   }
