@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import logger from '../config/logger';
 import { NotificationPayload, DeliveryResult } from '../types/reminder';
 import { withRetry, RetryableError, NonRetryableError } from '../utils/retry';
+import { sanitizeUrl } from '../utils/sanitize-url';
 
 export interface EmailConfig {
   host?: string;
@@ -217,7 +218,7 @@ export class EmailService {
 
     ${subscription.renewal_url ? `
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${subscription.renewal_url}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+      <a href="${sanitizeUrl(subscription.renewal_url)}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
         Manage Subscription
       </a>
     </div>
@@ -253,7 +254,7 @@ Price: $${subscription.price.toFixed(2)}/${subscription.billing_cycle}
 Renewal Date: ${renewalDateFormatted}
 ${daysBefore > 0 ? `Days Remaining: ${daysBefore}` : ''}
 
-${subscription.renewal_url ? `Manage Subscription: ${subscription.renewal_url}` : ''}
+${subscription.renewal_url ? `Manage Subscription: ${sanitizeUrl(subscription.renewal_url)}` : ''}
 
 This is an automated reminder from Synchro.
     `.trim();

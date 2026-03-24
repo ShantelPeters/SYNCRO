@@ -1,10 +1,45 @@
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { subscriptionService } from '../services/subscription-service';
 import { giftCardService } from '../services/gift-card-service';
 import { idempotencyService } from '../services/idempotency';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { validateSubscriptionOwnership, validateBulkSubscriptionOwnership } from '../middleware/ownership';
 import logger from '../config/logger';
+
+// Zod schema for URL fields — only http/https allowed
+const safeUrlSchema = z
+  .string()
+  .url('Must be a valid URL')
+  .refine(
+    (val) => {
+      try {
+        const { protocol } = new URL(val);
+        return protocol === 'http:' || protocol === 'https:';
+      } catch {
+        return false;
+      }
+    },
+    { message: 'URL must use http or https protocol' }
+  );
+
+// Validation schema for subscription create input
+const createSubscriptionSchema = z.object({
+  name: z.string().min(1),
+  price: z.number(),
+  billing_cycle: z.enum(['monthly', 'yearly', 'quarterly']),
+  renewal_url: safeUrlSchema.optional(),
+  website_url: safeUrlSchema.optional(),
+  logo_url: safeUrlSchema.optional(),
+});
+
+// Validation schema for subscription update input
+const updateSubscriptionSchema = z.object({
+  renewal_url: safeUrlSchema.optional(),
+  website_url: safeUrlSchema.optional(),
+  logo_url: safeUrlSchema.optional(),
+}).passthrough();
+
 
 const router = Router();
 
@@ -112,6 +147,15 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Validate URL fields
+    const urlValidation = createSubscriptionSchema.safeParse(req.body);
+    if (!urlValidation.success) {
+      return res.status(400).json({
+        success: false,
+        error: urlValidation.error.errors.map((e) => e.message).join(', '),
+      });
+    }
+
     // Create subscription
     const result = await subscriptionService.createSubscription(
       req.user!.id,
@@ -180,6 +224,15 @@ router.patch("/:id", validateSubscriptionOwnership, async (req: AuthenticatedReq
     }
 
     const expectedVersion = req.headers["if-match"] as string;
+
+    // Validate URL fields
+    const urlValidation = updateSubscriptionSchema.safeParse(req.body);
+    if (!urlValidation.success) {
+      return res.status(400).json({
+        success: false,
+        error: urlValidation.error.errors.map((e) => e.message).join(', '),
+      });
+    }
 
     const result = await subscriptionService.updateSubscription(
       req.user!.id,

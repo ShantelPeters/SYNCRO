@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import logger from '../config/logger';
 import { NotificationPayload, DeliveryResult } from '../types/reminder';
 import { withRetry, RetryableError, NonRetryableError } from '../utils/retry';
+import { sanitizeUrl } from '../utils/sanitize-url';
 
 export interface PushSubscription {
   endpoint: string;
@@ -59,7 +60,7 @@ export class PushService {
               subscriptionId: payload.subscription.id,
               reminderType: payload.reminderType,
               renewalDate: payload.renewalDate,
-              url: payload.subscription.renewal_url || '/dashboard',
+              url: payload.subscription.renewal_url ? sanitizeUrl(payload.subscription.renewal_url) : '/dashboard',
             },
             requireInteraction: payload.reminderType === 'renewal' && payload.daysBefore <= 1,
           });
