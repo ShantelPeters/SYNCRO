@@ -98,7 +98,7 @@ export class EventListener {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
     return data.result?.events || [];
   }
 
@@ -277,7 +277,7 @@ export class EventListener {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
     return data.result?.sequence || 0;
   }
 

@@ -31,8 +31,13 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing middleware
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Per-route body parser overrides for larger payloads
+app.use('/api/audit', express.json({ limit: '100kb' }));
+app.use('/api/admin', express.json({ limit: '50kb' }));
 
 // Admin access control middleware
 const adminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {

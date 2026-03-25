@@ -4,6 +4,8 @@ import { idempotencyService } from '../services/idempotency';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { validateSubscriptionOwnership, validateBulkSubscriptionOwnership } from '../middleware/ownership';
 import logger from '../config/logger';
+import { subscriptionCreateSchema, subscriptionUpdateSchema } from '../schemas/subscription.schema';
+import { ZodError } from 'zod';
 
 const router = Router();
 
@@ -51,7 +53,7 @@ router.get('/:id', validateSubscriptionOwnership, async (req: AuthenticatedReque
   try {
     const subscription = await subscriptionService.getSubscription(
       req.user!.id,
-      req.params.id
+      req.params.id as string
     );
 
     res.json({
@@ -98,19 +100,12 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Validate input
-    const { name, price, billing_cycle } = req.body;
-    if (!name || price === undefined || !billing_cycle) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: name, price, billing_cycle',
-      });
-    }
+    const validatedData = subscriptionCreateSchema.parse(req.body);
 
     // Create subscription
     const result = await subscriptionService.createSubscription(
       req.user!.id,
-      req.body,
-      idempotencyKey
+      validatedData
     );
 
     const responseBody = {
@@ -137,7 +132,14 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     res.status(statusCode).json(responseBody);
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors.map((e: any) => ({ path: e.path.join('.'), message: e.message })),
+      });
+    }
     logger.error('Create subscription error:', error);
     res.status(500).json({
       success: false,
@@ -172,10 +174,13 @@ router.patch('/:id', validateSubscriptionOwnership, async (req: AuthenticatedReq
 
     const expectedVersion = req.headers['if-match'] as string; // Optional optimistic locking
 
+    // Validate input
+    const validatedData = subscriptionUpdateSchema.parse(req.body);
+
     const result = await subscriptionService.updateSubscription(
       req.user!.id,
-      req.params.id,
-      req.body,
+      req.params.id as string,
+      validatedData,
       expectedVersion ? parseInt(expectedVersion) : undefined
     );
 
@@ -203,7 +208,14 @@ router.patch('/:id', validateSubscriptionOwnership, async (req: AuthenticatedReq
     }
 
     res.status(statusCode).json(responseBody);
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors.map((e: any) => ({ path: e.path.join('.'), message: e.message })),
+      });
+    }
     logger.error('Update subscription error:', error);
     const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
     res.status(statusCode).json({
@@ -221,7 +233,7 @@ router.delete('/:id', validateSubscriptionOwnership, async (req: AuthenticatedRe
   try {
     const result = await subscriptionService.deleteSubscription(
       req.user!.id,
-      req.params.id
+      req.params.id as string
     );
 
     const responseBody = {
@@ -255,7 +267,7 @@ router.post('/:id/retry-sync', validateSubscriptionOwnership, async (req: Authen
   try {
     const result = await subscriptionService.retryBlockchainSync(
       req.user!.id,
-      req.params.id
+      req.params.id as string
     );
 
     res.json({

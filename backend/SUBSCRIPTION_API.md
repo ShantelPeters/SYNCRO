@@ -335,13 +335,31 @@ POST /api/subscriptions/:id/retry-sync
 
 This endpoint attempts to sync the subscription to blockchain again.
 
-## Security Features
+## Security
 
-1. **Authentication Required**: All endpoints require valid JWT/cookie
-2. **Ownership Validation**: Every request validates user owns the subscription
-3. **RLS Policies**: Database-level row-level security
-4. **Input Validation**: Request payload validation
-5. **SQL Injection Protection**: Parameterized queries via Supabase
+### Payload Size Limits
+
+To prevent denial-of-service attacks and ensure system stability, the following payload size limits are enforced on all API requests:
+
+| Endpoint Range | Payload Type | Size Limit |
+|----------------|--------------|------------|
+| Global (Default) | JSON / URL-encoded | 10 KB |
+| `/api/audit/*` | Batch Audit Events | 100 KB |
+| `/api/admin/*` | Admin Operations | 50 KB |
+
+Requests exceeding these limits will receive a `413 Payload Too Large` response.
+
+### Request Validation
+
+All request bodies are validated using Zod schemas with strict type checking and maximum length constraints for string fields:
+
+- **Names / Providers**: Max 100 characters
+- **Categories**: Max 50 characters
+- **Notes / Descriptions**: Max 500 characters
+- **URLs (Logo, Website, Renewal)**: Max 2000 characters
+- **Tags**: Max 50 characters per tag
+
+Validation failures will return a `400 Bad Request` with detailed field-level error messages.
 
 ## Database Schema
 

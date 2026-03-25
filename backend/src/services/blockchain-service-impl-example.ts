@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * EXAMPLE: How to implement actual Soroban contract interaction
  * Replace the placeholder in blockchain-service.ts with this pattern
