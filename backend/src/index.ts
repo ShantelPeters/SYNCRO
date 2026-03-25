@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import logger from './config/logger';
+import { requestIdMiddleware } from './middleware/requestContext';
+import { requestLoggerMiddleware } from './middleware/requestLogger';
 import { schedulerService } from './services/scheduler';
 import { reminderEngine } from './services/reminder-engine';
 import subscriptionRoutes from './routes/subscriptions';
@@ -40,6 +42,11 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Request tracing — must come before routes so every log line carries requestId
+app.use(requestIdMiddleware);
+app.use(requestLoggerMiddleware);
+
 
 import { adminAuth } from './middleware/admin';
 
