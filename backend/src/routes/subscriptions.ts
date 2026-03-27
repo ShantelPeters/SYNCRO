@@ -7,9 +7,10 @@ import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { validateSubscriptionOwnership, validateBulkSubscriptionOwnership } from '../middleware/ownership';
 import logger from '../config/logger';
 
-// Zod schema for URL fields — only http/https allowed
+// Zod schema for URL fields — only http/https allowed, max 2000 chars (browser limit)
 const safeUrlSchema = z
   .string()
+  .max(2000, 'URL must not exceed 2000 characters')
   .url('Must be a valid URL')
   .refine(
     (val) => {
@@ -25,20 +26,55 @@ const safeUrlSchema = z
 
 // Validation schema for subscription create input
 const createSubscriptionSchema = z.object({
-  name: z.string().min(1),
-  price: z.number(),
+  name: z.string().min(1, 'Name is required').max(100, 'Name must not exceed 100 characters'),
+  description: z.string().max(500, 'Description must not exceed 500 characters').optional(),
+  price: z.number().min(0, 'Price must be non-negative').max(1_000_000, 'Price exceeds maximum allowed value'),
   billing_cycle: z.enum(['monthly', 'yearly', 'quarterly']),
+  category: z.string().max(50, 'Category must not exceed 50 characters').optional(),
   renewal_url: safeUrlSchema.optional(),
   website_url: safeUrlSchema.optional(),
   logo_url: safeUrlSchema.optional(),
+  notes: z.string().max(1000, 'Notes must not exceed 1000 characters').optional(),
 });
 
 // Validation schema for subscription update input
 const updateSubscriptionSchema = z.object({
+  name: z.string().min(1).max(100, 'Name must not exceed 100 characters').optional(),
+  description: z.string().max(500, 'Description must not exceed 500 characters').optional(),
+  price: z.number().min(0).max(1_000_000, 'Price exceeds maximum allowed value').optional(),
+  billing_cycle: z.enum(['monthly', 'yearly', 'quarterly']).optional(),
+  category: z.string().max(50, 'Category must not exceed 50 characters').optional(),
   renewal_url: safeUrlSchema.optional(),
   website_url: safeUrlSchema.optional(),
   logo_url: safeUrlSchema.optional(),
+  notes: z.string().max(1000, 'Notes must not exceed 1000 characters').optional(),
 }).passthrough();
+
+// Validation schema for bulk operations
+const bulkOperationSchema = z.object({
+  operation: z.enum(['delete', 'update'], { errorMap: () => ({ message: 'operation must be \'delete\' or \'update\'' }) }),
+  ids: z
+    .array(z.string().uuid('Each ID must be a valid UUID'))
+    .min(1, 'ids array must not be empty')
+    .max(50, 'Bulk operations are limited to 50 items at a time'),
+  data: z.object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().max(500).optional(),
+    price: z.number().min(0).max(1_000_000).optional(),
+    billing_cycle: z.enum(['monthly', 'yearly', 'quarterly']).optional(),
+    category: z.string().max(50).optional(),
+    renewal_url: safeUrlSchema.optional(),
+    website_url: safeUrlSchema.optional(),
+    logo_url: safeUrlSchema.optional(),
+  }).optional(),
+});
+
+// Gift-card attachment schema
+const attachGiftCardSchema = z.object({
+  giftCardHash: z.string().min(1).max(256, 'giftCardHash must not exceed 256 characters'),
+  provider: z.string().min(1).max(100, 'provider must not exceed 100 characters'),
+});
+
 
 
 const router = Router();
@@ -329,14 +365,16 @@ router.post('/:id/attach-gift-card', validateSubscriptionOwnership, async (req: 
     if (!subscriptionId) {
       return res.status(400).json({ success: false, error: 'Subscription ID required' });
     }
-    const { giftCardHash, provider } = req.body;
 
-    if (!giftCardHash || !provider) {
+    const bodyValidation = attachGiftCardSchema.safeParse(req.body);
+    if (!bodyValidation.success) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: giftCardHash, provider',
+        error: bodyValidation.error.errors.map((e) => e.message).join(', '),
       });
     }
+
+    const { giftCardHash, provider } = bodyValidation.data;
 
     const result = await giftCardService.attachGiftCard(
       req.user!.id,
@@ -672,14 +710,15 @@ router.post("/:id/resume", validateSubscriptionOwnership, async (req: Authentica
  */
 router.post("/bulk", validateBulkSubscriptionOwnership, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { operation, ids, data } = req.body;
-
-    if (!operation || !ids || !Array.isArray(ids)) {
+    const bodyValidation = bulkOperationSchema.safeParse(req.body);
+    if (!bodyValidation.success) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: operation, ids",
+        error: bodyValidation.error.errors.map((e) => e.message).join(', '),
       });
     }
+
+    const { operation, ids, data } = bodyValidation.data;
 
     const results = [];
     const errors = [];

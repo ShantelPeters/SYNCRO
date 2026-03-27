@@ -21,6 +21,9 @@ import { healthService } from './services/health-service';
 import { eventListener } from './services/event-listener';
 import { expiryService } from './services/expiry-service';
 import { scheduleAutoResume } from './jobs/auto-resume';
+import { adminAuth } from './middleware/admin';
+import { createAdminLimiter, RateLimiterFactory } from './middleware/rate-limit-factory';
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,18 +43,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── Payload-size limits ────────────────────────────────────────────────────
+// Per-route overrides MUST be registered before the global parsers so that
+// Express selects the correct limit for each path.
+
+// /api/audit accepts batches of up to 100 events — allow 100 kb
+app.use('/api/audit', express.json({ limit: '100kb' }));
+app.use('/api/audit', express.urlencoded({ extended: true, limit: '100kb' }));
+
+// /api/admin endpoints may send bulk config payloads — allow 50 kb
+app.use('/api/admin', express.json({ limit: '50kb' }));
+app.use('/api/admin', express.urlencoded({ extended: true, limit: '50kb' }));
+
+// Global default: everything else is capped at 10 kb
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
 // Middleware
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Request tracing — must come before routes so every log line carries requestId
 app.use(requestIdMiddleware);
 app.use(requestLoggerMiddleware);
-
-
-import { adminAuth } from './middleware/admin';
-import { createAdminLimiter, RateLimiterFactory } from './middleware/rate-limit-factory';
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -178,6 +191,33 @@ app.post('/api/admin/expiry/process', createAdminLimiter(), adminAuth, async (re
   }
 });
 
+
+// ─── Global error handler ────────────────────────────────────────────────────
+// Must be defined after all routes so Express treats it as an error-handling
+// middleware (4-argument signature).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Payload too large (express body-parser throws type === 'entity.too.large')
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    return res.status(413).json({
+      success: false,
+      error: 'Payload too large',
+      message: `Request body exceeds the size limit for this endpoint. Maximum allowed size depends on the route (default: 10 kb, /api/audit: 100 kb, /api/admin: 50 kb).`,
+    });
+  }
+
+  // Malformed JSON
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid JSON',
+      message: 'The request body contains malformed JSON.',
+    });
+  }
+
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ success: false, error: 'Internal server error' });
+});
 
 // Start server
 const server = app.listen(PORT, async () => {
