@@ -209,7 +209,7 @@ function AppContent({
                     pricing_type: restored.pricing_type || "fixed",
                     billing_cycle: restored.billing_cycle || "monthly",
                 });
-                const updatedSubs = [...subscriptions, { ...restored, id: Date.now() }];
+                const updatedSubs = [...(Array.isArray(subscriptions) ? subscriptions : []), { ...restored, id: Date.now() }];
                 updateSubscriptions(updatedSubs);
                 showToast({
                     title: "Restored",
@@ -236,21 +236,22 @@ function AppContent({
         handleToggleIntegration,
     } = useEmailAccounts({
         initialAccounts: initialEmailAccounts,
-        subscriptions,
-        updateSubscriptions,
-        addToHistory,
+        subscriptions: Array.isArray(subscriptions) ? subscriptions : [],
+        updateSubscriptions: (subs: any[]) => updateSubscriptions(subs as any),
+        addToHistory: (subs: any[]) => addToHistory(subs as any),
         onToast: showToast,
     });
 
     // Calculations
-    const recurringSpend = calculateRecurringSpend(subscriptions);
-    const totalSpend = calculateTotalSpend(subscriptions);
-    const renewalReminders = checkRenewalReminders(subscriptions);
+    const subscriptionsArray = Array.isArray(subscriptions) ? subscriptions : [];
+    const recurringSpend = calculateRecurringSpend(subscriptionsArray);
+    const totalSpend = calculateTotalSpend(subscriptionsArray);
+    const renewalReminders = checkRenewalReminders(subscriptionsArray);
     const budgetAlert = checkBudgetAlerts(totalSpend, budgetLimit);
 
     const { notifications, unreadNotifications, handleMarkNotificationRead } =
         useNotifications({
-            subscriptions,
+            subscriptions: subscriptionsArray,
             priceChanges,
             renewalReminders,
             consolidationSuggestions,
@@ -258,11 +259,11 @@ function AppContent({
         });
 
     const { handleResolveNotificationAction } = useNotificationActions({
-        subscriptions,
-        updateSubscriptions,
-        addToHistory,
+        subscriptions: subscriptionsArray,
+        updateSubscriptions: (subs: any[]) => updateSubscriptions(subs as any),
+        addToHistory: (subs: any[]) => addToHistory(subs as any),
         onCancelSubscription: handleCancelSubscription,
-        onShowDialog: showDialog,
+        onShowDialog: (dialog: any) => dialog ? showDialog(dialog) : hideDialog(),
         onToast: showToast,
         onShowInsightsPage: () => setShowInsightsPage(true),
     });
@@ -273,10 +274,10 @@ function AppContent({
         handleBulkCancel,
         handleBulkPause,
     } = useBulkActions({
-        subscriptions,
+        subscriptions: subscriptionsArray,
         selectedSubscriptions,
-        updateSubscriptions,
-        addToHistory,
+        updateSubscriptions: (subs: any[]) => updateSubscriptions(subs as any),
+        addToHistory: (subs: any[]) => addToHistory(subs as any),
         setSelectedSubscriptions,
         setBulkActionLoading,
         onToast: showToast,
@@ -284,11 +285,11 @@ function AppContent({
     });
 
     // Derived data
-    const duplicates = detectDuplicates(subscriptions);
-    const unusedSubscriptions = detectUnusedSubscriptions(subscriptions);
-    const trialSubscriptions = getTrialSubscriptions(subscriptions);
-    const cancelledSubscriptions = getCancelledSubscriptions(subscriptions);
-    const pausedSubscriptions = getPausedSubscriptions(subscriptions);
+    const duplicates = detectDuplicates(subscriptionsArray);
+    const unusedSubscriptions = detectUnusedSubscriptions(subscriptionsArray);
+    const trialSubscriptions = getTrialSubscriptions(subscriptionsArray);
+    const cancelledSubscriptions = getCancelledSubscriptions(subscriptionsArray);
+    const pausedSubscriptions = getPausedSubscriptions(subscriptionsArray);
     const maxSubscriptions =
         currentPlan === "free" ? 5 : currentPlan === "pro" ? 20 : 100;
 
@@ -441,13 +442,13 @@ function AppContent({
     };
 
     const handleManageSubscription = (subscription: DBSubscription) => {
-        setSelectedSubscription(subscription);
+        setSelectedSubscription(subscription as any);
         setShowManageSubscription(true);
     };
 
     const handleRenewSubscription = (subscription: DBSubscription) => {
-        if (subscription.renewalUrl) {
-            window.open(subscription.renewalUrl, "_blank");
+        if (subscription.renewal_url) {
+            window.open(subscription.renewal_url, "_blank");
             apiPost(`/api/subscriptions/${subscription.id}/track-interaction`).catch(() => {});
         }
     };
@@ -457,7 +458,7 @@ function AppContent({
     };
 
     const handleDeleteSubscription = (id: number) => {
-        const sub = subscriptions.find((s) => s.id === id);
+        const sub = subscriptionsArray.find((s) => s.id === id);
         if (!sub) return;
 
         showDialog({
@@ -474,21 +475,21 @@ function AppContent({
     };
 
     const handleAddFromNotification = (subscription: DetectedSubscription) => {
-        if (checkDuplicate(subscriptions, subscription.name)) {
+        if (checkDuplicate(subscriptionsArray, subscription.name)) {
             alert(`${subscription.name} already exists in your subscriptions!`);
             return;
         }
 
-        if (subscriptions.length >= maxSubscriptions) {
+        if (subscriptionsArray.length >= maxSubscriptions) {
             setShowUpgradePlan(true);
             return;
         }
 
         const updatedSubs = [
-            ...subscriptions,
+            ...subscriptionsArray,
             {
                 ...subscription,
-                id: Math.max(...subscriptions.map((s) => s.id), 0) + 1,
+                id: Math.max(...subscriptionsArray.map((s) => s.id), 0) + 1,
                 dateAdded: new Date().toISOString(),
                 emailAccountId:
                     subscription.emailAccountId ||
@@ -501,8 +502,8 @@ function AppContent({
                 billingCycle: "monthly",
             },
         ];
-        updateSubscriptions(updatedSubs);
-        addToHistory(updatedSubs);
+        updateSubscriptions(updatedSubs as any);
+        addToHistory(updatedSubs as any);
     };
 
     // Early returns for auth/onboarding
@@ -561,32 +562,10 @@ function AppContent({
         );
     }
 
-    if (subscriptions.length === 0) {
-        return (
-            <div
-                className={`min-h-screen ${
-                    darkMode
-                        ? "bg-[#1E2A35] text-[#F9F6F2]"
-                        : "bg-[#F9F6F2] text-[#1E2A35]"
-                } `}
-            >
-                <EmptyState
-                    icon="📦"
-                    title="No subscriptions yet"
-                    description="Start tracking your subscriptions by connecting your email or adding them manually."
-                    action={{
-                        label: "Add your first subscription",
-                        onClick: () => setShowAddSubscription(true),
-                    }}
-                    darkMode={darkMode}
-                />
-            </div>
-        );
-    }
-
     return (
-        <ErrorBoundary>
-            <AppLayout
+        <UndoProvider>
+            <ErrorBoundary>
+                <AppLayout
                 activeView={activeView}
                 onViewChange={setActiveView}
                 mode={mode}
@@ -628,7 +607,10 @@ function AppContent({
                     } else if (action === "toggle-theme") {
                         setDarkMode(!darkMode);
                     } else if (action === "sign-out") {
-                        auth.handleSignOut();
+                        // Sign out logic
+                        setMode("welcome");
+                        auth.setIsAuthenticated(false);
+                        auth.setShowLandingAuth(true);
                     }
                 }}
             >
@@ -642,43 +624,67 @@ function AppContent({
                 ) : (
                     <>
                         {activeView === "dashboard" && (
-                            <DashboardPage
-                                subscriptions={subscriptions}
-                                totalSpend={totalSpend}
-                                summary={analyticsSummary}
-                                insights={notifications}
-                                onViewInsights={handleViewInsights}
-                                onRenew={handleRenewSubscription}
-                                onManage={handleManageSubscription}
-                                darkMode={darkMode}
-                                emailAccounts={emailAccounts}
-                                duplicates={duplicates}
-                                unusedSubscriptions={unusedSubscriptions}
-                                trialSubscriptions={trialSubscriptions}
-                                displayCurrency={currency}
-                                exchangeRates={exchangeRates}
-                                ratesStale={ratesStale}
-                                isLoading={loading}
-                            />
+                            subscriptionsArray.length === 0 ? (
+                                <EmptyState
+                                    icon="📦"
+                                    title="No subscriptions yet"
+                                    description="Start tracking your subscriptions by connecting your email or adding them manually."
+                                    action={{
+                                        label: "Add your first subscription",
+                                        onClick: () => setShowAddSubscription(true),
+                                    }}
+                                    darkMode={darkMode}
+                                />
+                            ) : (
+                                <DashboardPage
+                                    subscriptions={subscriptionsArray}
+                                    totalSpend={totalSpend}
+                                    summary={analyticsSummary}
+                                    insights={notifications as any}
+                                    onViewInsights={handleViewInsights}
+                                    onRenew={handleRenewSubscription}
+                                    onManage={handleManageSubscription}
+                                    darkMode={darkMode}
+                                    emailAccounts={emailAccounts}
+                                    duplicates={duplicates}
+                                    unusedSubscriptions={unusedSubscriptions as any}
+                                    trialSubscriptions={trialSubscriptions}
+                                    displayCurrency={currency}
+                                    exchangeRates={exchangeRates}
+                                    ratesStale={ratesStale}
+                                />
+                            )
                         )}
                         {activeView === "subscriptions" && (
-                            <SubscriptionsPage
-                                subscriptions={subscriptions}
-                                onDelete={handleDeleteSubscription}
-                                maxSubscriptions={maxSubscriptions}
-                                currentPlan={currentPlan}
-                                onManage={handleManageSubscription}
-                                onRenew={handleRenewSubscription}
-                                selectedSubscriptions={selectedSubscriptions}
-                                onToggleSelect={handleToggleSubscriptionSelect}
-                                darkMode={darkMode}
-                                emailAccounts={emailAccounts}
-                                duplicates={duplicates}
-                                unusedSubscriptions={unusedSubscriptions}
-                                onPause={(sub) => handlePauseSubscription(sub.id)}
-                                onResume={(sub) => handleResumeSubscription(sub.id)}
-                                isLoading={loading}
-                            />
+                            subscriptionsArray.length === 0 ? (
+                                <EmptyState
+                                    icon="📦"
+                                    title="No subscriptions yet"
+                                    description="Start tracking your subscriptions by connecting your email or adding them manually."
+                                    action={{
+                                        label: "Add your first subscription",
+                                        onClick: () => setShowAddSubscription(true),
+                                    }}
+                                    darkMode={darkMode}
+                                />
+                            ) : (
+                                <SubscriptionsPage
+                                    subscriptions={subscriptionsArray}
+                                    onDelete={handleDeleteSubscription}
+                                    maxSubscriptions={maxSubscriptions}
+                                    currentPlan={currentPlan}
+                                    onManage={handleManageSubscription as any}
+                                    onRenew={handleRenewSubscription as any}
+                                    selectedSubscriptions={selectedSubscriptions}
+                                    onToggleSelect={handleToggleSubscriptionSelect}
+                                    darkMode={darkMode}
+                                    emailAccounts={emailAccounts}
+                                    duplicates={duplicates}
+                                    unusedSubscriptions={unusedSubscriptions as any}
+                                    onPause={(sub) => handlePauseSubscription(sub.id)}
+                                    onResume={(sub) => handleResumeSubscription(sub.id)}
+                                />
+                            )
                         )}
                         {activeView === "analytics" && (
                             analyticsSummary ? (
@@ -701,8 +707,8 @@ function AppContent({
                         )}
                         {activeView === "teams" && (
                             <TeamsPage
-                                workspace={workspace}
-                                subscriptions={subscriptions}
+                                workspace={workspace!}
+                                subscriptions={subscriptionsArray}
                                 darkMode={darkMode}
                                 emailAccounts={emailAccounts}
                             />
@@ -748,6 +754,7 @@ function AppContent({
                     </>
                 )}
             </AppLayout>
+            </ErrorBoundary>
 
             {/* Onboarding Tour */}
             {shouldShowTour && mode === "individual" && (
@@ -871,6 +878,6 @@ function AppContent({
                     darkMode={darkMode}
                 />
             )}
-        </ErrorBoundary>
+        </UndoProvider>
     );
 }

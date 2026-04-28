@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS } from "react-joyride-react-19"
-import { Plus, Mail, Wallet, Sparkles } from "lucide-react"
+import { Plus, Mail, Wallet } from "lucide-react"
 
 interface OnboardingTourEnhancedProps {
   onComplete?: () => void
@@ -128,7 +128,7 @@ const TOUR_STEPS = [
         </div>
         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
           <p className="text-xs text-green-800 dark:text-green-200">
-            <strong>🎉 Setup Complete!</strong> You're ready to manage your subscriptions.
+            <strong>🎉 Setup Complete!</strong> You&apos;re ready to manage your subscriptions.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
