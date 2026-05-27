@@ -119,4 +119,118 @@ router.get('/:id/deliveries', async (req: AuthenticatedRequest, res: Response) =
   }
 });
 
+/**
+ * GET /api/webhooks/dead-letter/all
+ * Get all dead-letter deliveries for the user
+ */
+router.get('/dead-letter/all', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const deadLetters = await webhookService.getAllUserDeadLetters(req.user!.id);
+    res.json({ success: true, data: deadLetters });
+  } catch (error) {
+    logger.error('Get all dead-letter deliveries error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch dead-letter deliveries',
+    });
+  }
+});
+
+/**
+ * GET /api/webhooks/:id/dead-letter
+ * Get dead-letter deliveries for a specific webhook
+ */
+router.get('/:id/dead-letter', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const deadLetters = await webhookService.getDeadLetterDeliveries(
+      req.user!.id,
+      Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
+    );
+    res.json({ success: true, data: deadLetters });
+  } catch (error) {
+    logger.error('Get dead-letter deliveries error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch dead-letter deliveries',
+    });
+  }
+});
+
+/**
+ * GET /api/webhooks/dead-letter/stats
+ * Get dead-letter statistics for the user
+ */
+router.get('/dead-letter/stats', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const stats = await webhookService.getDeadLetterStats(req.user!.id);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    logger.error('Get dead-letter stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch dead-letter stats',
+    });
+  }
+});
+
+/**
+ * POST /api/webhooks/:deliveryId/dead-letter/replay
+ * Create a replay request for a dead-letter delivery
+ */
+router.post('/:deliveryId/dead-letter/replay', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { idempotency_key } = req.body;
+    const deliveryId = Array.isArray(req.params.deliveryId) ? req.params.deliveryId[0] : req.params.deliveryId;
+    
+    const replay = await webhookService.createDeadLetterReplay(
+      req.user!.id,
+      deliveryId,
+      idempotency_key,
+    );
+    res.status(201).json({ success: true, data: replay });
+  } catch (error) {
+    logger.error('Create replay request error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create replay request',
+    });
+  }
+});
+
+/**
+ * GET /api/webhooks/:deliveryId/dead-letter/replay-history
+ * Get replay history for a dead-letter delivery
+ */
+router.get('/:deliveryId/dead-letter/replay-history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const deliveryId = Array.isArray(req.params.deliveryId) ? req.params.deliveryId[0] : req.params.deliveryId;
+    const history = await webhookService.getDeadLetterReplayHistory(req.user!.id, deliveryId);
+    res.json({ success: true, data: history });
+  } catch (error) {
+    logger.error('Get replay history error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch replay history',
+    });
+  }
+});
+
+/**
+ * POST /api/webhooks/dead-letter/replay/:replayId/execute
+ * Execute a replay for a dead-letter delivery
+ */
+router.post('/dead-letter/replay/:replayId/execute', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const replayId = Array.isArray(req.params.replayId) ? req.params.replayId[0] : req.params.replayId;
+    const result = await webhookService.executeDeadLetterReplay(req.user!.id, replayId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Execute replay error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to execute replay',
+    });
+  }
+});
+
 export default router;
