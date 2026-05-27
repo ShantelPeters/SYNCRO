@@ -9,7 +9,17 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { z } from "zod"
-import { RateLimiters, validateCsrfToken } from "@/lib/api/index"
+import { RateLimiters, createErrorResponse, validateCsrfToken } from "@/lib/api/index"
+import { ApiException } from "@/lib/api/errors"
+import { applyRateLimitHeaders, type RateLimitHeaders } from "@/lib/api/rate-limit"
+
+function importJsonResponse(
+  body: unknown,
+  status: number,
+  rateLimitHeaders: RateLimitHeaders,
+) {
+  return applyRateLimitHeaders(NextResponse.json(body, { status }), rateLimitHeaders)
+}
 
 // ─── Validation (mirrors backend csv-import-service) ─────────────────────
 
@@ -104,12 +114,14 @@ export async function GET(request: NextRequest) {
 // ─── Import ───────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID()
+  let rateLimitHeaders: RateLimitHeaders = {}
+
   try {
     // Enforce CSRF protection
     validateCsrfToken(request)
 
-    // Apply strict rate limiting for bulk imports (5 imports per hour)
-    RateLimiters.strict(request)
+    rateLimitHeaders = RateLimiters.import(request)
 
     const supabase = await createClient()
     const {
@@ -122,14 +134,12 @@ export async function POST(request: NextRequest) {
 
     // Parse multipart form
     const formData = await request.formData()
-    const file = formData.get("file")
-    
-    if (!file || typeof file === "string") {
-      return NextResponse.json({ success: false, error: "Please upload a valid CSV file." }, { status: 400 })
+    const file = formData.get("file") as File | null
+    if (!file) {
+      return importJsonResponse({ success: false, error: "No CSV file uploaded" }, 400, rateLimitHeaders)
     }
-    
-    if (!file.name || !file.name.endsWith(".csv")) {
-      return NextResponse.json({ success: false, error: "Only CSV files are accepted" }, { status: 400 })
+    if (!file.name.endsWith(".csv")) {
+      return importJsonResponse({ success: false, error: "Only CSV files are accepted" }, 400, rateLimitHeaders)
     }
 
     const mappingStr = formData.get("mappings") as string | null
@@ -154,13 +164,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (records.length === 0) {
-      return NextResponse.json({ success: false, error: "The CSV file has no data rows." }, { status: 400 })
+      return importJsonResponse(
+        { success: false, error: "The CSV file is empty or has no data rows." },
+        400,
+        rateLimitHeaders,
+      )
     }
 
     if (records.length > 500) {
-      return NextResponse.json(
+      return importJsonResponse(
         { success: false, error: `File contains ${records.length} rows — limit is 500 per import.` },
-        { status: 400 },
+        400,
+        rateLimitHeaders,
       )
     }
 
@@ -227,7 +242,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isCommit) {
-      return NextResponse.json({ success: true, data: { preview } })
+      return applyRateLimitHeaders(
+        NextResponse.json({ success: true, data: { preview } }),
+        rateLimitHeaders,
+      )
     }
 
     // Commit
@@ -260,9 +278,14 @@ export async function POST(request: NextRequest) {
       errors: preview.errorCount,
     }
 
-    return NextResponse.json({ success: true, data: result })
-
+    return applyRateLimitHeaders(
+      NextResponse.json({ success: true, data: result }),
+      rateLimitHeaders,
+    )
   } catch (err) {
+    if (err instanceof ApiException) {
+      return createErrorResponse(err, requestId)
+    }
     const message = err instanceof Error ? err.message : "Import failed"
     return NextResponse.json({ success: false, error: message }, { status: 400 })
   }

@@ -38,6 +38,7 @@ import { isMaintenanceMode } from './env'
 import { ApiErrors } from './errors'
 import { idempotencyService } from './idempotency'
 import { validateCsrfToken } from './csrf'
+import { applyRateLimitHeaders, type RateLimitHeaders } from './rate-limit'
 
 type RouteHandler = (
   request: NextRequest,
@@ -48,7 +49,7 @@ type RouteHandler = (
 type RouteOptions = {
   requireAuth?: boolean
   requireRole?: UserRole[]
-  rateLimit?: (request: NextRequest) => void
+  rateLimit?: (request: NextRequest) => RateLimitHeaders
   skipMaintenanceCheck?: boolean
   idempotent?: boolean
   skipCsrf?: boolean
@@ -63,6 +64,8 @@ export function createApiRoute(
       throw ApiErrors.serviceUnavailable('Service is currently under maintenance')
     }
 
+    let rateLimitHeaders: RateLimitHeaders = {}
+
     // CSRF protection for all mutating requests (POST, PUT, PATCH, DELETE)
     const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
     if (isMutating && !options.skipCsrf) {
@@ -70,7 +73,7 @@ export function createApiRoute(
     }
 
     if (options.rateLimit) {
-      options.rateLimit(request)
+      rateLimitHeaders = options.rateLimit(request)
     }
 
     const context = createRequestContext(request)
@@ -149,7 +152,10 @@ export function createApiRoute(
       response.headers.set('X-Idempotency-Key', idempotencyKey)
     }
 
+    if (Object.keys(rateLimitHeaders).length > 0) {
+      return applyRateLimitHeaders(response, rateLimitHeaders) as NextResponse<ApiResponse>
+    }
+
     return response
   }, crypto.randomUUID())
 }
-
