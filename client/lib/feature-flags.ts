@@ -3,16 +3,27 @@
  * Centralized feature flag management for the application
  */
 
+import {
+  getBlockchainFlags,
+  type BlockchainFlags,
+} from '../../shared/blockchain-flags';
+
 export interface FeatureFlags {
     paypalEnabled: boolean
     mockPaymentsEnabled: boolean
     stripeEnabled: boolean
+    /** Whether testnet-only blockchain actions are permitted. */
+    testnetActionsEnabled: boolean
+    /** Master switch: whether on-chain writes are enabled. */
+    blockchainEnabled: boolean
 }
 
 /**
  * Get feature flags from environment variables
  */
 export function getFeatureFlags(): FeatureFlags {
+    const blockchain: BlockchainFlags = getBlockchainFlags();
+
     return {
         // PayPal is enabled if credentials are configured
         paypalEnabled: !!(
@@ -27,6 +38,10 @@ export function getFeatureFlags(): FeatureFlags {
 
         // Stripe is enabled if API key is configured
         stripeEnabled: !!process.env.STRIPE_SECRET_KEY,
+
+        // Blockchain flags (Issue #84)
+        testnetActionsEnabled: blockchain.testnetActionsEnabled,
+        blockchainEnabled: blockchain.blockchainEnabled,
     }
 }
 
@@ -82,4 +97,21 @@ export function getDefaultPaymentProvider(): 'stripe' | 'paypal' | 'mock' {
     if (flags.mockPaymentsEnabled) return 'mock'
 
     throw new Error('No payment provider is configured')
+}
+
+/**
+ * Check whether testnet-only blockchain actions are allowed.
+ *
+ * Use this before rendering testnet-specific UI (faucet links, friendbot
+ * buttons, testnet contract call forms, etc.).
+ */
+export function isTestnetActionAllowed(): boolean {
+    return getFeatureFlags().testnetActionsEnabled
+}
+
+/**
+ * Check whether on-chain writes are enabled.
+ */
+export function isBlockchainEnabled(): boolean {
+    return getFeatureFlags().blockchainEnabled
 }

@@ -12,11 +12,33 @@
 
 import logger from '../config/logger';
 import { supabase } from '../config/database';
+import {
+  getBlockchainFlags,
+  resolveStellarNetwork,
+} from '../../../shared/blockchain-flags';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const RPC_URL =
-  process.env.SOROBAN_RPC_URL ?? 'https://soroban-testnet.stellar.org';
+const _flags = getBlockchainFlags();
+const _network = resolveStellarNetwork();
+
+// Resolve RPC URL — never silently fall back to testnet in production.
+function resolveRpcUrl(): string {
+  const configured = process.env.SOROBAN_RPC_URL;
+  if (!configured && _flags.isProduction) {
+    throw new Error(
+      '[indexer] SOROBAN_RPC_URL must be explicitly set in production. ' +
+        'Refusing to fall back to the testnet RPC endpoint.',
+    );
+  }
+  if (configured) return configured;
+  // Non-production: pick a sensible default per network
+  if (_network === 'mainnet') return 'https://soroban-rpc.creit.tech';
+  if (_network === 'futurenet') return 'https://rpc-futurenet.stellar.org';
+  return 'https://soroban-testnet.stellar.org';
+}
+
+const RPC_URL = resolveRpcUrl();
 const CONTRACT_ID = process.env.SOROBAN_CONTRACT_ADDRESS ?? '';
 const POLL_INTERVAL_MS = parseInt(
   process.env.INDEXER_POLL_INTERVAL_MS ?? '6000',
@@ -182,8 +204,14 @@ export async function startIndexer(): Promise<void> {
     return;
   }
 
+  // Honour the ENABLE_BLOCKCHAIN master switch
+  if (!_flags.blockchainEnabled) {
+    logger.warn('Indexer: ENABLE_BLOCKCHAIN=false — indexer disabled');
+    return;
+  }
+
   running = true;
-  logger.info('Indexer: started', { rpcUrl: RPC_URL, contractId: CONTRACT_ID });
+  logger.info('Indexer: started', { rpcUrl: RPC_URL, contractId: CONTRACT_ID, network: _network });
 
   while (running) {
     try {

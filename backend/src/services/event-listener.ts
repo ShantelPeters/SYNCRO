@@ -4,6 +4,10 @@ import { reorgHandler } from './reorg-handler';
 import { generateCycleId } from '../utils/cycle-id';
 import { renewalCooldownService } from './renewal-cooldown-service';
 import { calculateBackoffDelay } from '../utils/retry';
+import {
+  getBlockchainFlags,
+  resolveStellarNetwork,
+} from '../../../shared/blockchain-flags';
 
 import { 
   ContractEvent, 
@@ -43,10 +47,11 @@ const RETRY_MAX_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
 export class EventListener {
   private contractId: string;
-  private rpcUrl: string;
+  private rpcUrl: string = '';
   private lastProcessedLedger: number = 0;
   private isRunning: boolean = false;
   private isProcessing: boolean = false;
+  private activeRequestController: AbortController | null = null;
 
   // Configurable via env var — defaults to 5 seconds
   private readonly pollInterval: number = parseInt(
@@ -64,12 +69,38 @@ export class EventListener {
 
   constructor() {
     this.contractId = process.env.SOROBAN_CONTRACT_ADDRESS || '';
-    this.rpcUrl = process.env.STELLAR_NETWORK_URL || 'https://soroban-testnet.stellar.org';
+
+    const flags = getBlockchainFlags();
+    const network = resolveStellarNetwork();
+
+    // Resolve RPC URL — never silently fall back to testnet in production.
+    const configuredUrl = process.env.STELLAR_NETWORK_URL;
+    if (!configuredUrl && flags.isProduction) {
+      this._status = 'disabled';
+      this._disabledReason =
+        'STELLAR_NETWORK_URL must be explicitly set in production. ' +
+        'Refusing to fall back to the testnet RPC endpoint.';
+      logger.error(`EventListener disabled: ${this._disabledReason}`);
+    } else {
+      this.rpcUrl =
+        configuredUrl ||
+        (network === 'mainnet'
+          ? 'https://soroban-rpc.creit.tech'
+          : network === 'futurenet'
+            ? 'https://rpc-futurenet.stellar.org'
+            : 'https://soroban-testnet.stellar.org');
+    }
 
     if (!this.contractId) {
       this._status = 'disabled';
       this._disabledReason = 'SOROBAN_CONTRACT_ADDRESS not configured';
       logger.warn('EventListener disabled: SOROBAN_CONTRACT_ADDRESS not configured');
+    }
+
+    if (!flags.blockchainEnabled) {
+      this._status = 'disabled';
+      this._disabledReason = 'ENABLE_BLOCKCHAIN=false — event listener is disabled';
+      logger.warn(`EventListener disabled: ${this._disabledReason}`);
     }
   }
 

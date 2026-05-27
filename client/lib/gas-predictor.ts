@@ -110,7 +110,18 @@ class GasPredictorService {
   }
 
   private getRpcUrl(): string {
-    const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
+    const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? '';
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // In production, NEXT_PUBLIC_SOROBAN_RPC_URL must be explicitly set.
+    // We never silently fall back to the testnet RPC in a production build.
+    if (isProduction && !process.env.NEXT_PUBLIC_SOROBAN_RPC_URL) {
+      throw new Error(
+        '[gas-predictor] NEXT_PUBLIC_SOROBAN_RPC_URL must be set in production. ' +
+          'Refusing to fall back to the testnet RPC endpoint.',
+      );
+    }
+
     return (
       process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ??
       RPC_ENDPOINTS[network] ??
