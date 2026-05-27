@@ -58,6 +58,12 @@ backend/
 **Update Cadence**: Every Sprint
 
 ### ✅ Security Features
+- **Role-based access control (RBAC)**: Privileged routes enforce explicit role or admin-key requirements
+  - `/api/keys`, `/api/webhooks`: `owner`, `admin` only
+  - `/api/compliance/account/delete*`: `owner` only (self-service export/status remains authenticated-user scoped)
+  - `POST /api/audit`: authenticated users (`owner`, `admin`, `member`, `viewer`); events are bound to the caller
+  - `GET /api/audit`, `/api/admin/*`, reminder process triggers: `X-Admin-API-Key` header required
+  - Unauthorized requests return **401**; authenticated but disallowed requests return **403**
 - **Rate Limiting**: Comprehensive rate limiting on authentication endpoints
   - Team invitations: 20/hour per user
   - MFA operations: 10/15min per user  

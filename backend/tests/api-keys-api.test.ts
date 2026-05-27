@@ -18,6 +18,7 @@ const fromImplementation = (tableName: string) => {
           query._single = true;
           return query;
         },
+        maybeSingle: () => query,
         then: (resolve: any, reject: any) => {
           const result = selectMock(...args);
           return Promise.resolve(result).then(resolve, reject);
@@ -69,6 +70,7 @@ import express from 'express';
 import request from 'supertest';
 import apiKeysRoutes from '../src/routes/api-keys';
 import { supabase } from '../src/config/database';
+import { errorHandler } from '../src/middleware/errorHandler';
 
 describe('/api/keys routes', () => {
   let app: express.Application;
@@ -80,10 +82,16 @@ describe('/api/keys routes', () => {
     app = express();
     app.use(express.json());
     app.use((req: any, _res, next) => {
-      req.user = { id: userId, authMethod: 'jwt', scopes: ['subscriptions:read', 'subscriptions:write'] };
+      req.user = {
+        id: userId,
+        role: 'owner',
+        authMethod: 'jwt',
+        scopes: ['subscriptions:read', 'subscriptions:write'],
+      };
       next();
     });
     app.use('/api/keys', apiKeysRoutes);
+    app.use(errorHandler);
 
     (supabase as any).__mocks.insertMock.mockReset().mockImplementation(async (payload: any) => {
       console.log('INSERT MOCK CALLED', payload);
