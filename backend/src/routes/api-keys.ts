@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate';
 import logger from '../config/logger';
 import { createApiKeySchema } from '../schemas/api-key';
 import { NotFoundError } from '../errors';
+import { auditApiKeyEvent } from '../services/audit-service';
 
 const router: Router = Router();
 
@@ -52,6 +53,13 @@ router.post(
         logger.error('Failed to create API key', { error });
         return res.status(500).json({ error: 'Failed to create API key' });
       }
+
+      await auditApiKeyEvent('api_key.created', req.user.id, {
+        keyName: name,
+        scopes,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       return res.status(201).json({ success: true, key, scopes });
     } catch (error) {
@@ -100,6 +108,12 @@ router.delete('/:id', requireRole('owner', 'admin'), requireScope('subscriptions
     .eq('user_id', req.user!.id);
 
   if (error) throw error;
+
+  await auditApiKeyEvent('api_key.revoked', req.user!.id, {
+    keyId: req.params.id,
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
 
   res.json({ success: true, message: 'API key revoked' });
 });
