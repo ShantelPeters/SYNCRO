@@ -37,16 +37,20 @@ export interface Subscription {
   price: number;
   billing_cycle: string;
   status: string;
+  /** ISO-8601 UTC timestamp of the next billing event. */
   next_billing_date: string | null;
   logo_url: string | null;
   website_url: string | null;
   renewal_url: string | null;
   notes: string | null;
   tags: string[];
+  /** ISO-8601 UTC timestamp when the subscription expired. */
   expired_at: string | null;
+  /** ISO-8601 UTC timestamp until which the subscription is active. */
   active_until: string | null;
   // Trial tracking fields
   is_trial: boolean;
+  /** ISO-8601 UTC timestamp when the trial ends. */
   trial_ends_at: string | null;
   trial_converts_to_price: number | null;
   credit_card_required: boolean;
@@ -80,6 +84,23 @@ export interface DeliveryResult {
   metadata?: Record<string, any>;
 }
 
+/**
+ * Timestamp and timezone storage rules for UserPreferences
+ * ─────────────────────────────────────────────────────────
+ * • `updated_at`           — ISO-8601 UTC string (TIMESTAMPTZ in DB).
+ * • `quiet_hours_start`    — Wall-clock time in HH:MM (24-hour) format.
+ *                            Stored as a bare TIME in the DB; has no timezone
+ *                            component of its own.  Always interpreted in the
+ *                            context of `quiet_hours_timezone`.
+ * • `quiet_hours_end`      — Same format and rules as `quiet_hours_start`.
+ * • `quiet_hours_timezone` — IANA timezone identifier (e.g. "America/New_York").
+ *                            All quiet-hours comparisons MUST be performed in
+ *                            this timezone, never in raw UTC.
+ *
+ * Rendering rule: when displaying any timestamp to the user, convert from UTC
+ * to `quiet_hours_timezone` (or the profile-level `timezone` field) using the
+ * `date-fns-tz` library on the backend or `Intl.DateTimeFormat` on the client.
+ */
 export interface UserPreferences {
   user_id: string;
   notification_channels: ('email' | 'push' | 'telegram' | 'slack')[];
@@ -95,15 +116,19 @@ export interface UserPreferences {
   };
   risk_notification_threshold?: 'LOW' | 'MEDIUM' | 'HIGH';
   quiet_hours_enabled: boolean;
-  quiet_hours_start: string; // HH:MM format
-  quiet_hours_end: string; // HH:MM format
-  quiet_hours_timezone: string; // IANA timezone identifier
+  /** Wall-clock start of quiet hours in HH:MM (24-hour) format. */
+  quiet_hours_start: string;
+  /** Wall-clock end of quiet hours in HH:MM (24-hour) format. */
+  quiet_hours_end: string;
+  /** IANA timezone identifier used to interpret quiet_hours_start/end. */
+  quiet_hours_timezone: string;
   critical_alerts_only: boolean;
   currency: string;
   timezone: string;
   locale: string;
   calendar_sync_enabled: boolean;
   calendar_export_reminders: boolean;
+  /** ISO-8601 UTC string. */
   updated_at: string;
 }
 

@@ -10,6 +10,7 @@ module.exports = {
     setupFiles: ['<rootDir>/tests/setup.ts'],
     transform: {
         '^.+\\.tsx?$': 'ts-jest',
+        '^.+\\.js$': ['ts-jest', { diagnostics: false }],
     },
     globals: {
         'ts-jest': {
@@ -23,7 +24,7 @@ module.exports = {
         },
     },
     transformIgnorePatterns: [
-        '/node_modules/(?!@stellar/stellar-sdk)',
+        '/node_modules/(?!(@stellar/stellar-sdk|uuid))',
     ],
     coverageThreshold: {
         global: {
