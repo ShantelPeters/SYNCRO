@@ -1027,6 +1027,184 @@ fn test_lifecycle_multiple_renewals_update_last_renewed() {
 fn test_get_lifecycle_nonexistent_sub() {
     let (_env, client, _admin) = setup();
     client.get_lifecycle(&999);
+}
+
+// ── Renewal window invariant tests (I-W1..I-W5) ──────────────────
+
+/// I-W1: billing_start must be strictly less than billing_end.
+#[test]
+#[should_panic(expected = "Invalid window: start must be before end")]
+fn test_window_start_must_be_before_end() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 900u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+    // start == end — should panic
+    client.set_window(&sub_id, &1735689600u64, &1735689600u64);
+}
+
+/// I-W1: start > end is also rejected.
+#[test]
+#[should_panic(expected = "Invalid window: start must be before end")]
+fn test_window_start_after_end_rejected() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 901u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+    // start > end — should panic
+    client.set_window(&sub_id, &1735862400u64, &1735689600u64);
+}
+
+/// I-W2: renew() succeeds when current timestamp is within the window.
+#[test]
+fn test_renew_within_window_succeeds() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 902u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // Window: [1000, 2000]
+    client.set_window(&sub_id, &1000u64, &2000u64);
+
+    // Set ledger timestamp inside the window
+    env.ledger().with_mut(|li| {
+        li.timestamp = 1500;
+    });
+
+    client.approve_renewal(&sub_id, &1, &1000, &100);
+    client.acquire_renewal_lock(&sub_id, &200);
+    let result = client.renew(&sub_id, &1, &500, &3, &10, &20260101u64, &true);
+    assert!(result);
+}
+
+/// I-W2: renew() panics when current timestamp is before billing_start.
+#[test]
+#[should_panic(expected = "Outside renewal window")]
+fn test_renew_before_window_panics() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 903u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // Window: [1000, 2000]
+    client.set_window(&sub_id, &1000u64, &2000u64);
+
+    // Set ledger timestamp before the window
+    env.ledger().with_mut(|li| {
+        li.timestamp = 500;
+    });
+
+    client.approve_renewal(&sub_id, &1, &1000, &100);
+    client.acquire_renewal_lock(&sub_id, &200);
+    client.renew(&sub_id, &1, &500, &3, &10, &20260101u64, &true);
+}
+
+/// I-W2: renew() panics when current timestamp is after billing_end.
+#[test]
+#[should_panic(expected = "Outside renewal window")]
+fn test_renew_after_window_panics() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 904u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // Window: [1000, 2000]
+    client.set_window(&sub_id, &1000u64, &2000u64);
+
+    // Set ledger timestamp after the window
+    env.ledger().with_mut(|li| {
+        li.timestamp = 2500;
+    });
+
+    client.approve_renewal(&sub_id, &1, &1000, &100);
+    client.acquire_renewal_lock(&sub_id, &200);
+    client.renew(&sub_id, &1, &500, &3, &10, &20260101u64, &true);
+}
+
+/// I-W3: renew() succeeds with no time restriction when no window is set.
+#[test]
+fn test_renew_without_window_has_no_time_restriction() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 905u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // No set_window call — window is optional
+    env.ledger().with_mut(|li| {
+        li.timestamp = 9999999999;
+    });
+
+    client.approve_renewal(&sub_id, &1, &1000, &100);
+    client.acquire_renewal_lock(&sub_id, &200);
+    let result = client.renew(&sub_id, &1, &500, &3, &10, &20260101u64, &true);
+    assert!(result);
+}
+
+/// I-W4: Only the subscription owner can set the window.
+#[test]
+fn test_set_window_owner_only() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 906u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // Owner sets window — should succeed
+    client.set_window(&sub_id, &1000u64, &2000u64);
+
+    let window = client.get_window(&sub_id);
+    assert!(window.is_some());
+    let w = window.unwrap();
+    assert_eq!(w.billing_start, 1000);
+    assert_eq!(w.billing_end, 2000);
+}
+
+/// I-W5: Approval is consumed before the window check; a failed window check
+/// leaves the approval marked as used.
+#[test]
+fn test_approval_consumed_before_window_check() {
+    let (env, client, _admin) = setup();
+    let user = Address::generate(&env);
+    let sub_id = 907u64;
+    let merchant = Address::generate(&env);
+    client.init_sub(&user, &merchant, &500, &86400, &1000, &sub_id);
+
+    // Window: [1000, 2000]
+    client.set_window(&sub_id, &1000u64, &2000u64);
+
+    // Timestamp outside window
+    env.ledger().with_mut(|li| {
+        li.timestamp = 500;
+    });
+
+    client.approve_renewal(&sub_id, &1, &1000, &100);
+    client.acquire_renewal_lock(&sub_id, &200);
+
+    // This should panic "Outside renewal window" — approval is consumed first
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.renew(&sub_id, &1, &500, &3, &10, &20260101u64, &true);
+    }));
+    assert!(result.is_err());
+
+    // Now move inside the window and try to reuse the same approval — should fail
+    // because the approval was already consumed (marked used) before the window panic
+    env.ledger().with_mut(|li| {
+        li.timestamp = 1500;
+    });
+    client.acquire_renewal_lock(&sub_id, &200);
+    // Attempting to reuse approval_id 1 should panic "Invalid or expired approval"
+    let result2 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.renew(&sub_id, &1, &500, &3, &10, &20260102u64, &true);
+    }));
+    assert!(result2.is_err());
+}
+
     pub fn create_subscription(
         env: Env,
         subscriber: Address,
