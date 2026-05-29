@@ -185,9 +185,12 @@ If you encounter any issues with the branch protection or have questions about t
 - Help newer contributors learn and improve
 - Report any code of conduct violations to the maintainers
 ## Additional Resources
-- [PR Submission Guide](./PR_SUBMISSION_GUIDE.md)
+- [PR Submission Guide](./docs/archive/PR_SUBMISSION_GUIDE.md)
 - [Backend README](./backend/README.md)
 - [Client README](./client/README.md)
 - [GitHub Docs on Branch Protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
 ---
 Thank you for helping make Synchro better! 🚀
+
+## Issue Delivery Notes
+When completing an issue, any long-form implementation artifacts, summaries, or delivery notes must be stored in the `docs/archive/` directory rather than the repository root. This keeps the root directory clean and ensures that active project entrypoints are easy to find.

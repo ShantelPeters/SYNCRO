@@ -7,6 +7,24 @@ on:
     branches: [main]
 
 jobs:
+  lint-root:
+    name: Lint Root Directory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify no implementation artifacts in root
+        run: |
+          ALLOWED="README.md CONTRIBUTING.md AGENTS.md CLAUDE.md requirements.txt"
+          for file in *.md *.txt; do
+            if [ -f "$file" ]; then
+              if ! echo "$ALLOWED" | grep -w -q "$file"; then
+                echo "❌ Error: $file found in root. Move long-form implementation artifacts to docs/archive/."
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ Root directory is clean"
+
   lint-backend:
     name: Lint Backend
     runs-on: ubuntu-latest

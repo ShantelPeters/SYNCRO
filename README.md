@@ -19,7 +19,7 @@ Synchro is a decentralized, self-custodial subscription management platform that
 - **Smart Contracts**: Functional Soroban contracts for subscription renewal, escrow, and virtual card interaction on Stellar Testnet.
 - **Overall**: Core MVP functionality is **90% complete** and undergoing final production hardening.
 
-For detailed status, see [CurrentState.md](file:///c:/Users/HP/Desktop/SYNCRO/CurrentState.md).
+For detailed status, see [./docs/archive/CurrentState.md](file:///c:/Users/HP/Desktop/SYNCRO/./docs/archive/CurrentState.md).
 
 ## Phase 1 (MVP) Workflow
 Supported Payment Method
@@ -137,8 +137,8 @@ Synchro only tracks subscriptions, sends reminders, and provides guidance to mak
 
 For detailed information about directory ownership, responsibilities, and triage guidance, see:
 
-- [Directory Ownership Matrix](./DIRECTORY_OWNERSHIP_MATRIX.md) - Complete ownership information
-- [Ownership Quick Reference](./OWNERSHIP_QUICK_REFERENCE.md) - Quick lookup guide
+- [Directory Ownership Matrix](./docs/archive/DIRECTORY_OWNERSHIP_MATRIX.md) - Complete ownership information
+- [Ownership Quick Reference](./docs/archive/OWNERSHIP_QUICK_REFERENCE.md) - Quick lookup guide
 - [CODEOWNERS](./.github/CODEOWNERS) - GitHub enforcement
 - [Code Review Process](./docs/code-review-process.md) - Review procedures
 
