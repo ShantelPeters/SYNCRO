@@ -24,29 +24,41 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Validate client environment variables
+      # ── Structural check (always — PRs + pushes) ──────────────────────────
+      # Secret-free: asserts manifests and .env.example files are in sync.
+      # Fails fast on config drift without needing real secrets, so forked /
+      # contributor PRs are not broken by absent secrets.
+      - name: Structural env check (manifests ↔ .env.example)
+        run: |
+          node scripts/check-env-docs.js
+          node backend/scripts/validate-env.js --structural
+          node client/scripts/validate-env.js --structural
+
+      # ── Strict presence check (pushes to protected branches only) ─────────
+      # Real secrets are injected here; the validators hard-fail if any
+      # REQUIRED var is missing (issue #601 — CI fails fast).
+      - name: Validate client environment variables (strict)
+        if: github.event_name == 'push'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
         run: node client/scripts/validate-env.js
 
-      - name: Validate backend environment variables
+      - name: Validate backend environment variables (strict)
+        if: github.event_name == 'push'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PORT: ${{ secrets.PORT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           SOROBAN_CONTRACT_ADDRESS: ${{ secrets.SOROBAN_CONTRACT_ADDRESS }}
           STELLAR_NETWORK_URL: ${{ secrets.STELLAR_NETWORK_URL }}
         run: node backend/scripts/validate-env.js

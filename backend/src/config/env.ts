@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import logger from './logger';
 
-const envSchema = z.object({
+// Exported so the env manifest parity test (tests/env-manifest.test.ts) can
+// introspect which keys are required vs optional and assert they match
+// backend/scripts/env.manifest.js — the single source of truth for var names.
+export const envSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('3001'),

@@ -16,6 +16,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key required').optional(),
 
   // API Configuration
+  // NEXT_PUBLIC_API_URL is the canonical name; NEXT_PUBLIC_API_BASE is the
+  // deprecated alias kept for backward compatibility (see docs/ENVIRONMENT.md).
+  NEXT_PUBLIC_API_URL: z.string().url('Invalid API URL').optional(),
   NEXT_PUBLIC_API_BASE: z.string().url('Invalid API base URL').optional(),
   API_SECRET_KEY: z.string().min(1, 'API secret key required').optional(),
 
@@ -68,6 +71,7 @@ export function getEnv(): Env {
     validatedEnv = envSchema.parse({
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
       NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE,
       API_SECRET_KEY: process.env.API_SECRET_KEY,
       RATE_LIMIT_ENABLED: process.env.RATE_LIMIT_ENABLED,
@@ -138,7 +142,9 @@ export function getApiConfig() {
   const defaultBase =
     process.env.NEXT_PUBLIC_APP_ENV === 'staging' ? stagingApi : productionApi
   return {
-    baseUrl: env.NEXT_PUBLIC_API_BASE || defaultBase,
+    // Prefer the canonical NEXT_PUBLIC_API_URL; fall back to the deprecated
+    // NEXT_PUBLIC_API_BASE so existing deployments keep working.
+    baseUrl: env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_API_BASE || defaultBase,
     secretKey: env.API_SECRET_KEY,
     rateLimitEnabled: env.RATE_LIMIT_ENABLED,
   }

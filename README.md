@@ -142,6 +142,14 @@ For detailed information about directory ownership, responsibilities, and triage
 - [CODEOWNERS](./.github/CODEOWNERS) - GitHub enforcement
 - [Code Review Process](./docs/code-review-process.md) - Review procedures
 
+## Environment Variables
+
+Each package declares its environment variables in a manifest that drives both
+the `.env.example` files and CI validation. See
+[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md) for the canonical strategy:
+per-package required/optional variables, naming conventions, the CI enforcement
+model, and how to add a new variable.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines and development setup instructions.
