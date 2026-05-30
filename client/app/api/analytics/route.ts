@@ -2,6 +2,7 @@ import { type NextRequest } from "next/server"
 import { HttpStatus } from "@/lib/api/types"
 import { createClient } from "@/lib/supabase/server"
 import { createAuthenticatedApiRoute, createSuccessResponse, RateLimiters, ApiErrors } from "@/lib/api/index"
+import { buildCategoryMonthlySpend, calculateMonthlySpend } from "@syncro/shared/subscription-math"
 
 export const GET = createAuthenticatedApiRoute(
   async (request: NextRequest, context, user) => {
@@ -9,7 +10,7 @@ export const GET = createAuthenticatedApiRoute(
 
     const { data: subscriptions, error } = await supabase
       .from("subscriptions")
-      .select("price, category, status, created_at")
+      .select("price, billing_cycle, category, status, created_at")
       .eq("user_id", user.id)
       .eq("status", "active")
 
@@ -17,25 +18,20 @@ export const GET = createAuthenticatedApiRoute(
       throw ApiErrors.internalError(`Failed to fetch analytics: ${error.message}`)
     }
 
-    const totalSpend =
-      subscriptions?.reduce((sum, sub) => sum + (sub.price || 0), 0) || 0
-
+    const totalSpend = calculateMonthlySpend(subscriptions ?? [])
     const monthlySpend = totalSpend
 
-    const categoryMap = new Map<string, number>()
-    subscriptions?.forEach((sub) => {
-      const category = sub.category || "Uncategorized"
-      categoryMap.set(category, (categoryMap.get(category) || 0) + (sub.price || 0))
-    })
-
-    const categoryBreakdown = Array.from(categoryMap.entries()).map(
-      ([category, spend]) => ({
+    const categoryBreakdown = buildCategoryMonthlySpend(
+      subscriptions ?? [],
+      "Uncategorized",
+    ).map(({ category, totalMonthlySpend, percentage }) => {
+      const spend = totalMonthlySpend
+      return {
         category,
         spend,
-        percentage:
-          totalSpend > 0 ? Math.round((spend / totalSpend) * 100) : 0,
-      })
-    )
+        percentage: Math.round(percentage),
+      }
+    })
 
     const spendTrend = [
       { month: "Jan", spend: Math.round(totalSpend * 0.8) },

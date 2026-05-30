@@ -12,6 +12,7 @@ import { z } from "zod"
 import { ApiErrors, RateLimiters, createErrorResponse, getAuthenticatedUser, validateCsrfToken } from "@/lib/api/index"
 import { ApiException } from "@/lib/api/errors"
 import { applyRateLimitHeaders, type RateLimitHeaders } from "@/lib/api/rate-limit"
+import { isSafeHttpUrl } from "@syncro/shared/security"
 
 function importJsonResponse(
   body: unknown,
@@ -81,12 +82,7 @@ const rowSchema = z.object({
     .transform((v) => v?.trim() || null)
     .refine((v) => {
       if (!v) return true
-      try {
-        const { protocol } = new URL(v)
-        return protocol === "http:" || protocol === "https:"
-      } catch {
-        return false
-      }
+      return isSafeHttpUrl(v)
     }, "renewal_url must be a valid http/https URL or empty"),
 })
 

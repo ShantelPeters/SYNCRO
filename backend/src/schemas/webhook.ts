@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { safeUrlSchema } from './common';
 
 const webhookEventSchema = z.enum([
   'subscription.renewal_due',
@@ -9,24 +10,8 @@ const webhookEventSchema = z.enum([
   'reminder.sent',
 ]);
 
-const webhookUrlSchema = z
-  .string()
-  .max(2000, 'URL must not exceed 2000 characters')
-  .url('Must be a valid URL')
-  .refine(
-    (val) => {
-      try {
-        const { protocol } = new URL(val);
-        return protocol === 'http:' || protocol === 'https:';
-      } catch {
-        return false;
-      }
-    },
-    { message: 'URL must use http or https protocol' },
-  );
-
 export const createWebhookSchema = z.object({
-  url: webhookUrlSchema,
+  url: safeUrlSchema,
   events: z
     .array(webhookEventSchema)
     .min(1, 'At least one event type is required')
@@ -38,7 +23,7 @@ export const createWebhookSchema = z.object({
 });
 
 export const updateWebhookSchema = z.object({
-  url: webhookUrlSchema.optional(),
+  url: safeUrlSchema.optional(),
   events: z
     .array(webhookEventSchema)
     .min(1, 'At least one event type is required')

@@ -11,7 +11,7 @@ import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import logger from '../config/logger';
 import { BadRequestError } from '../errors';
 import { validateRequest } from '../utils/validation';
-import { cursorPaginationSchema } from '../schemas/common';
+import { cursorPaginationSchema, safeUrlSchema } from '../schemas/common';
 
 const router = Router();
 
@@ -29,21 +29,6 @@ const upload = multer({
 });
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
-
-const safeUrlSchema = z
-  .string()
-  .url('Must be a valid URL')
-  .refine(
-    (val) => {
-      try {
-        const { protocol } = new URL(val);
-        return protocol === 'http:' || protocol === 'https:';
-      } catch {
-        return false;
-      }
-    },
-    { message: 'URL must use http or https protocol' }
-  );
 
 const createSubscriptionSchema = z.object({
   name: z.string().min(1),

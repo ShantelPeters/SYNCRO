@@ -28,7 +28,7 @@
     "preinstall": "npm run lint:deps"
   },
   "dependencies": {
-    "@syncro/shared": "*",
+    "@syncro/shared": "file:../shared",
     "@tremor/react": "^3.17.4",
     "@hookform/resolvers": "^5.4.0",
     "@radix-ui/react-accordion": "1.2.12",

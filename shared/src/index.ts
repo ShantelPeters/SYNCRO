@@ -23,6 +23,12 @@ export * from './user';
 // Analytics models
 export * from './analytics';
 
+// Shared subscription calculations
+export * from './subscription-math';
+
+// Shared security helpers
+export * from './security';
+
 // Common utilities
 export * from './common';
 

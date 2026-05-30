@@ -1,6 +1,7 @@
 import { supabase, monitorPool, PoolMetrics } from '../config/database';
 import logger from '../config/logger';
 import { ExternalServiceClient, ServiceMetrics } from '../utils/external-service-client';
+import { normalizeToMonthlyAmount } from '@syncro/shared/subscription-math';
 
 // ─── Existing interfaces ────────────────────────────────────────────────────
 
@@ -192,10 +193,7 @@ export class MonitoringService {
                     for (const sub of subs) {
                         metrics.category_distribution[sub.category] = (metrics.category_distribution[sub.category] || 0) + 1;
                         if (sub.status === 'active') {
-                            let monthlyPrice = sub.price;
-                            if (sub.billing_cycle === 'yearly') monthlyPrice = sub.price / 12;
-                            else if (sub.billing_cycle === 'weekly') monthlyPrice = sub.price * 4;
-                            metrics.total_monthly_revenue += monthlyPrice;
+                            metrics.total_monthly_revenue += normalizeToMonthlyAmount(sub.price, sub.billing_cycle);
                         }
                     }
                 }

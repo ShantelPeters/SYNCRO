@@ -8,6 +8,10 @@ module.exports = {
     resetMocks: true,
     restoreMocks: true,
     setupFiles: ['<rootDir>/tests/setup.ts'],
+    moduleNameMapper: {
+        '^@syncro/shared$': '<rootDir>/../shared/src',
+        '^@syncro/shared/(.*)$': '<rootDir>/../shared/src/$1',
+    },
     transform: {
         '^.+\\.tsx?$': ['ts-jest', {
             diagnostics: false,

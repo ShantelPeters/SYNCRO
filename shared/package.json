@@ -3,7 +3,31 @@
   "version": "1.0.0",
   "description": "Shared domain models and types for SYNCRO",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
+  "typesVersions": {
+    "*": {
+      "subscription-math": ["src/subscription-math.ts"],
+      "security": ["src/security.ts"],
+      "*": ["src/*"]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js"
+    },
+    "./subscription-math": {
+      "types": "./src/subscription-math.ts",
+      "import": "./src/subscription-math.ts",
+      "require": "./dist/subscription-math.js"
+    },
+    "./security": {
+      "types": "./src/security.ts",
+      "import": "./src/security.ts",
+      "require": "./dist/security.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
