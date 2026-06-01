@@ -61,7 +61,7 @@ jobs:
 
       - name: Stop Supabase local stack
         if: always()
-        run: supabase stop
+        run: if command -v supabase &> /dev/null; then supabase stop; fi
 
   # Integration with main CI pipeline
   validate-rls-on-production:
@@ -83,7 +83,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install
 
       - name: Validate RLS on Production Database
         env:
