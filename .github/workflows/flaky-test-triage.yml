@@ -36,7 +36,7 @@ jobs:
 
       - name: Create issue for critical flaky tests
         if: steps.check-flaky.outputs.has_flaky == 'true' && steps.check-flaky.outputs.critical_count > 0
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -79,7 +79,7 @@ jobs:
 
       - name: Comment on PR with flaky test summary
         if: github.event.workflow_run.pull_requests[0] && steps.check-flaky.outputs.has_flaky == 'true'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
