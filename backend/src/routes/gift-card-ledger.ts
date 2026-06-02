@@ -4,6 +4,7 @@ import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { giftCardLedgerService } from '../services/gift-card-ledger-service';
 import { validate } from '../middleware/validate';
 import { BadRequestError } from '../errors';
+import { parseDbError } from '../utils/db-constraint-errors';
 import { validateLimit } from '../utils/pagination';
 
 const router = Router();
@@ -44,9 +45,17 @@ router.get('/history', async (req: AuthenticatedRequest, res: Response) => {
 
 /** POST /api/gift-card-ledger/top-up */
 router.post('/top-up', validate(topUpSchema), async (req: AuthenticatedRequest, res: Response) => {
-  const { amount, description } = req.body;
-  const entry = await giftCardLedgerService.topUp(req.user!.id, amount, description);
-  res.status(201).json({ success: true, data: entry });
+  try {
+    const { amount, description } = req.body;
+    const entry = await giftCardLedgerService.topUp(req.user!.id, amount, description);
+    res.status(201).json({ success: true, data: entry });
+  } catch (err: any) {
+    const appError = parseDbError(err);
+    if (appError) {
+      return res.status(appError.status).json({ success: false, error: appError.message, field: appError.field });
+    }
+    throw err;
+  }
 });
 
 /** POST /api/gift-card-ledger/deduct */
