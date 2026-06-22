@@ -20,7 +20,7 @@ jobs:
       client: ${{ steps.filter.outputs.client }}
       force_full_run: ${{ github.event.inputs.force_full_run || 'false' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -36,7 +36,7 @@ jobs:
     name: Lint Root Directory
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Verify no implementation artifacts in root
         run: |
           ALLOWED="README.md CONTRIBUTING.md AGENTS.md CLAUDE.md requirements.txt"
@@ -60,7 +60,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
@@ -84,7 +84,7 @@ jobs:
         working-directory: client
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
