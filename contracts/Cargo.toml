@@ -7,7 +7,7 @@ members = [
   "contracts/virtual-card",
   "contracts/escrow",
   "contracts/agent-registry",
-  "contracts/payment-channel",
+  "contracts/zk-payment-verifier",
 ]
 
 [workspace.dependencies]
