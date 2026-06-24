@@ -79,7 +79,7 @@ async function fetchUserPreferences(): Promise<{ reminder_jitter_level?: JitterL
   return json.data;
 }
 
-async function updateUserPreferences(updates: { reminder_jitter_level: JitterLevel }): Promise<void> {
+async function updateUserPreferences(updates: { reminder_jitter_level?: JitterLevel; [key: string]: any }): Promise<void> {
   const res = await fetch(`${API_BASE}/api/user-preferences`, {
     method: 'PATCH',
     credentials: 'include',
@@ -87,6 +87,25 @@ async function updateUserPreferences(updates: { reminder_jitter_level: JitterLev
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error('Failed to update user preferences');
+}
+
+async function fetchPrivacyPreferences(): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/privacy-preferences`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('Failed to fetch privacy preferences');
+  const json = await res.json();
+  return json.data;
+}
+
+async function updatePrivacyPreferences(updates: any): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/privacy-preferences`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Failed to update privacy preferences');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -118,6 +137,17 @@ export default function DataPrivacyPage() {
   const [jitterLoading, setJitterLoading] = useState(false);
   const [jitterError, setJitterError] = useState<string | null>(null);
 
+  // ── Privacy preferences state ─────────────────────────────────────────────
+  const [privacyPrefs, setPrivacyPrefs] = useState({
+    stealthAddressesEnabled: false,
+    encryptionEnabled: false,
+    paymentChannelsEnabled: false,
+    privateAuditLogsEnabled: false,
+    preferredGiftCardProvider: 'paypal',
+  });
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -134,6 +164,15 @@ export default function DataPrivacyPage() {
         }
       })
       .catch(err => console.error(err));
+    
+    // Load privacy preferences
+    fetchPrivacyPreferences()
+      .then(prefs => {
+        if (prefs) {
+          setPrivacyPrefs(prefs);
+        }
+      })
+      .catch(err => console.error('Failed to load privacy preferences:', err));
   }, []);
 
   // ── Handle jitter change ──────────────────────────────────────────────────
@@ -149,6 +188,37 @@ export default function DataPrivacyPage() {
       setJitterLoading(false);
     }
   };
+
+  // ── Handle privacy preference change ──────────────────────────────────────
+  const handlePrivacyToggle = async (key: string, value: boolean) => {
+    setPrivacyLoading(true);
+    setPrivacyError(null);
+    try {
+      const updates = { ...privacyPrefs, [key]: value };
+      await updatePrivacyPreferences(updates);
+      setPrivacyPrefs(updates);
+    } catch (err) {
+      setPrivacyError(err instanceof Error ? err.message : 'Failed to update privacy settings');
+    } finally {
+      setPrivacyLoading(false);
+    }
+  };
+
+  // ── Calculate privacy score ───────────────────────────────────────────────
+  const calculatePrivacyScore = () => {
+    let score = 0;
+    const maxScore = 5; // 4 toggles + 1 for privacy mode
+    
+    if (settings.privacyModeEnabled) score++;
+    if (privacyPrefs.stealthAddressesEnabled) score++;
+    if (privacyPrefs.encryptionEnabled) score++;
+    if (privacyPrefs.paymentChannelsEnabled) score++;
+    if (privacyPrefs.privateAuditLogsEnabled) score++;
+    
+    return { current: score, max: maxScore };
+  };
+
+  const privacyScore = calculatePrivacyScore();
 
   // ── Export polling ────────────────────────────────────────────────────────
   const stopPolling = useCallback(() => {
@@ -310,7 +380,24 @@ export default function DataPrivacyPage() {
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">Data &amp; Privacy</h1>
         <p className="text-sm text-gray-500 mb-8">Manage your personal data and privacy preferences.</p>
 
-        <div className="space-y-6">
+        {/* ── Privacy Score Card ────────────────────────────────────────────── */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Privacy Score</h3>
+              <p className="text-xs text-gray-600">How many privacy features you've enabled</p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-indigo-600">{privacyScore.current}/{privacyScore.max}</div>
+              <div className="w-32 h-2 bg-gray-200 rounded-full mt-2">
+                <div
+                  className="h-full bg-indigo-600 rounded-full transition-all"
+                  style={{ width: `${(privacyScore.current / privacyScore.max) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
           {/* ── Section 1: Privacy Mode ─────────────────────────────────────────── */}
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6" aria-labelledby="privacy-mode-heading">
             <h2 id="privacy-mode-heading" className="text-base font-semibold text-gray-900 mb-1">Privacy Mode</h2>
@@ -345,6 +432,111 @@ export default function DataPrivacyPage() {
                   </p>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* ── Section: Privacy Features ──────────────────────────────────── */}
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6" aria-labelledby="privacy-features-heading">
+            <h2 id="privacy-features-heading" className="text-base font-semibold text-gray-900 mb-1">Privacy Features</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Enable advanced privacy features to maximize anonymity and protect your subscription data.
+            </p>
+
+            {privacyError && (
+              <div role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                {privacyError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Stealth Addresses */}
+              <div className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                <div>
+                  <label className="text-sm font-medium text-gray-900">Stealth Addresses</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Generate unique stealth addresses for each subscription to prevent linking
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={privacyPrefs.stealthAddressesEnabled}
+                  onChange={(e) => handlePrivacyToggle('stealthAddressesEnabled', e.target.checked)}
+                  disabled={privacyLoading}
+                  className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* On-chain Metadata Encryption */}
+              <div className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                <div>
+                  <label className="text-sm font-medium text-gray-900">On-chain Metadata Encryption</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Encrypt subscription metadata before storing on-chain
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={privacyPrefs.encryptionEnabled}
+                  onChange={(e) => handlePrivacyToggle('encryptionEnabled', e.target.checked)}
+                  disabled={privacyLoading}
+                  className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Payment Channels */}
+              <div className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                <div>
+                  <label className="text-sm font-medium text-gray-900">Payment Channels</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use payment channels for off-chain transactions without blockchain visibility
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={privacyPrefs.paymentChannelsEnabled}
+                  onChange={(e) => handlePrivacyToggle('paymentChannelsEnabled', e.target.checked)}
+                  disabled={privacyLoading}
+                  className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Private Audit Logs */}
+              <div className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                <div>
+                  <label className="text-sm font-medium text-gray-900">Private Audit Logs</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Store audit logs with commitment blinding for privacy-preserving audits
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={privacyPrefs.privateAuditLogsEnabled}
+                  onChange={(e) => handlePrivacyToggle('privateAuditLogsEnabled', e.target.checked)}
+                  disabled={privacyLoading}
+                  className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Gift Card Provider */}
+              <div className="p-4 border border-gray-100 rounded-lg">
+                <label htmlFor="gift-card-provider" className="text-sm font-medium text-gray-900">
+                  Preferred Gift Card Provider
+                </label>
+                <p className="text-xs text-gray-500 mt-1 mb-3">
+                  Choose your default provider for redeeming subscription gift cards
+                </p>
+                <select
+                  id="gift-card-provider"
+                  value={privacyPrefs.preferredGiftCardProvider}
+                  onChange={(e) => handlePrivacyToggle('preferredGiftCardProvider', e.target.value as any)}
+                  disabled={privacyLoading}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="paypal">PayPal</option>
+                  <option value="stripe">Stripe</option>
+                  <option value="square">Square</option>
+                </select>
+              </div>
             </div>
           </section>
 
