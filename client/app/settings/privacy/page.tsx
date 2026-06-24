@@ -80,7 +80,7 @@ async function fetchUserPreferences(): Promise<{ reminder_jitter_level?: JitterL
   return json.data;
 }
 
-async function updateUserPreferences(updates: { reminder_jitter_level: JitterLevel }): Promise<void> {
+async function updateUserPreferences(updates: { reminder_jitter_level?: JitterLevel; [key: string]: any }): Promise<void> {
   const res = await fetch(`${API_BASE}/api/user-preferences`, {
     method: 'PATCH',
     credentials: 'include',
@@ -88,6 +88,25 @@ async function updateUserPreferences(updates: { reminder_jitter_level: JitterLev
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error('Failed to update user preferences');
+}
+
+async function fetchPrivacyPreferences(): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/privacy-preferences`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('Failed to fetch privacy preferences');
+  const json = await res.json();
+  return json.data;
+}
+
+async function updatePrivacyPreferences(updates: any): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/privacy-preferences`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Failed to update privacy preferences');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -122,6 +141,17 @@ export default function DataPrivacyPage() {
   const [stealthStatus, setStealthStatus] = useState<string | null>(null);
   const [stealthLoading, setStealthLoading] = useState(false);
 
+  // ── Privacy preferences state ─────────────────────────────────────────────
+  const [privacyPrefs, setPrivacyPrefs] = useState({
+    stealthAddressesEnabled: false,
+    encryptionEnabled: false,
+    paymentChannelsEnabled: false,
+    privateAuditLogsEnabled: false,
+    preferredGiftCardProvider: 'paypal',
+  });
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -138,6 +168,15 @@ export default function DataPrivacyPage() {
         }
       })
       .catch(err => console.error(err));
+    
+    // Load privacy preferences
+    fetchPrivacyPreferences()
+      .then(prefs => {
+        if (prefs) {
+          setPrivacyPrefs(prefs);
+        }
+      })
+      .catch(err => console.error('Failed to load privacy preferences:', err));
   }, []);
 
   // ── Handle jitter change ──────────────────────────────────────────────────
@@ -344,7 +383,24 @@ export default function DataPrivacyPage() {
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">Data &amp; Privacy</h1>
         <p className="text-sm text-gray-500 mb-8">Manage your personal data and privacy preferences.</p>
 
-        <div className="space-y-6">
+        {/* ── Privacy Score Card ────────────────────────────────────────────── */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Privacy Score</h3>
+              <p className="text-xs text-gray-600">How many privacy features you've enabled</p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-indigo-600">{privacyScore.current}/{privacyScore.max}</div>
+              <div className="w-32 h-2 bg-gray-200 rounded-full mt-2">
+                <div
+                  className="h-full bg-indigo-600 rounded-full transition-all"
+                  style={{ width: `${(privacyScore.current / privacyScore.max) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
           {/* ── Section 1: Privacy Mode ─────────────────────────────────────────── */}
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6" aria-labelledby="privacy-mode-heading">
             <h2 id="privacy-mode-heading" className="text-base font-semibold text-gray-900 mb-1">Privacy Mode</h2>
