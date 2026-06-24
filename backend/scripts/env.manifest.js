@@ -141,6 +141,10 @@ const optional = [
 
   // Risk calculation
   'RISK_CALC_CONCURRENCY',
+
+  // Agent HD Wallet — Address Rotation (Issue #862)
+  'AGENT_MASTER_SEED',
+  'AGENT_ROTATION_SCHEDULE',
 ];
 
 /** Deprecated names that must NOT appear as active keys in .env.example. */
