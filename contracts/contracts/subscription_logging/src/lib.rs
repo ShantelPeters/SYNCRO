@@ -1,8 +1,11 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, vec, Address, Bytes, BytesN, Env, String, Vec,
+    contract, contractevent, contractimpl, contracttype, vec, Address, Bytes, BytesN, Env, String,
+    Vec,
 };
+
+mod commitment;
 
 // ============================================================================
 // LEGACY TYPES (Preserved for backward compatibility)
@@ -65,12 +68,12 @@ enum DataKey {
     // Legacy keys
     Admin,
     Logs(u64),
-    
+
     // New commitment keys (no sub_id to prevent linkage)
-    CommitmentCount,              // Global counter: u64
-    Commitment(u64),               // commitment_index -> AuditCommitment
-    MerkleRootCount,              // Number of Merkle roots anchored
-    MerkleRootByIndex(u64),       // root_index -> MerkleRoot
+    CommitmentCount,        // Global counter: u64
+    Commitment(u64),        // commitment_index -> AuditCommitment
+    MerkleRootCount,        // Number of Merkle roots anchored
+    MerkleRootByIndex(u64), // root_index -> MerkleRoot
 }
 
 // ============================================================================
@@ -108,14 +111,18 @@ impl SubscriptionLoggingContract {
     // ========================================================================
     // INITIALIZATION
     // ========================================================================
-    
+
     pub fn init(env: Env, admin: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("Already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::CommitmentCount, &0u64);
-        env.storage().instance().set(&DataKey::MerkleRootCount, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::CommitmentCount, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::MerkleRootCount, &0u64);
     }
 
     fn require_admin(env: &Env) {
@@ -132,11 +139,7 @@ impl SubscriptionLoggingContract {
 
         let key = DataKey::Logs(sub_id);
 
-        let mut logs: Vec<LogEntry> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(vec![&env]);
+        let mut logs: Vec<LogEntry> = env.storage().persistent().get(&key).unwrap_or(vec![&env]);
 
         let entry = LogEntry {
             sub_id,
@@ -155,10 +158,7 @@ impl SubscriptionLoggingContract {
     pub fn get_logs(env: Env, sub_id: u64) -> Vec<LogEntry> {
         let key = DataKey::Logs(sub_id);
 
-        env.storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(vec![&env])
+        env.storage().persistent().get(&key).unwrap_or(vec![&env])
     }
 
     // ========================================================================
@@ -166,13 +166,13 @@ impl SubscriptionLoggingContract {
     // ========================================================================
 
     /// Record a cryptographic commitment to an audit event
-    /// 
+    ///
     /// # Arguments
     /// * `commitment_hash` - SHA-256(event_data || blinding_factor || domain_separator)
-    /// 
+    ///
     /// # Returns
     /// * `commitment_index` - Unique monotonic index for this commitment
-    /// 
+    ///
     /// # Privacy
     /// No subscription metadata is stored on-chain. The commitment reveals
     /// nothing about the underlying event without the blinding factor.
@@ -185,7 +185,7 @@ impl SubscriptionLoggingContract {
             .instance()
             .get(&DataKey::CommitmentCount)
             .unwrap_or(0);
-        
+
         let next_index = commitment_index + 1;
         env.storage()
             .instance()
@@ -214,10 +214,10 @@ impl SubscriptionLoggingContract {
     }
 
     /// Retrieve a commitment by its index
-    /// 
+    ///
     /// # Arguments
     /// * `commitment_index` - The index of the commitment to retrieve
-    /// 
+    ///
     /// # Returns
     /// * `Option<AuditCommitment>` - The commitment if it exists
     pub fn get_commitment(env: Env, commitment_index: u64) -> Option<AuditCommitment> {
@@ -235,14 +235,14 @@ impl SubscriptionLoggingContract {
     }
 
     /// Get multiple commitments by range
-    /// 
+    ///
     /// # Arguments
     /// * `start_index` - First commitment index (inclusive)
     /// * `end_index` - Last commitment index (inclusive)
-    /// 
+    ///
     /// # Returns
     /// * `Vec<AuditCommitment>` - Vector of commitments in range
-    /// 
+    ///
     /// # Limits
     /// Maximum 100 commitments per query to prevent excessive compute
     pub fn get_commitments_range(
@@ -270,21 +270,16 @@ impl SubscriptionLoggingContract {
     // ========================================================================
 
     /// Anchor a Merkle root representing a batch of commitments
-    /// 
+    ///
     /// # Arguments
     /// * `root_hash` - Root hash of Merkle tree
     /// * `start_index` - First commitment index in batch
     /// * `end_index` - Last commitment index in batch (inclusive)
-    /// 
+    ///
     /// # Privacy
     /// Batching commitments into Merkle trees hides individual commitment
     /// timing and reduces on-chain storage costs.
-    pub fn anchor_merkle_root(
-        env: Env,
-        root_hash: BytesN<32>,
-        start_index: u64,
-        end_index: u64,
-    ) {
+    pub fn anchor_merkle_root(env: Env, root_hash: BytesN<32>, start_index: u64, end_index: u64) {
         Self::require_admin(&env);
 
         // Validate indices
@@ -303,7 +298,7 @@ impl SubscriptionLoggingContract {
             .instance()
             .get(&DataKey::MerkleRootCount)
             .unwrap_or(0);
-        
+
         env.storage()
             .instance()
             .set(&DataKey::MerkleRootCount, &(root_count + 1));
@@ -346,13 +341,13 @@ impl SubscriptionLoggingContract {
     }
 
     /// Verify a commitment exists within a Merkle root
-    /// 
+    ///
     /// # Arguments
     /// * `commitment_index` - Index of commitment to verify
     /// * `root_index` - Index of Merkle root
     /// * `proof_path` - Sibling hashes in Merkle path
     /// * `proof_directions` - Left (false) or right (true) at each level
-    /// 
+    ///
     /// # Returns
     /// * `bool` - True if commitment is in the Merkle tree
     pub fn verify_merkle_membership(
@@ -386,7 +381,7 @@ impl SubscriptionLoggingContract {
 
         // Compute root from proof
         let mut current_hash = commitment.commitment_hash;
-        
+
         for i in 0..proof_path.len() {
             let sibling = proof_path.get_unchecked(i);
             let is_right = proof_directions.get_unchecked(i);
