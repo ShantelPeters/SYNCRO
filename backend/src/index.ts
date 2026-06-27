@@ -31,6 +31,7 @@ import { schedulerService } from './services/scheduler';
 import { reminderEngine } from './services/reminder-engine';
 import { notificationPreferenceService } from './services/notification-preference-service';
 import subscriptionRoutes from './routes/subscriptions';
+import subscriptionShareRoutes from './routes/subscription-shares';
 import riskScoreRoutes from './routes/risk-score';
 import simulationRoutes from './routes/simulation';
 import merchantRoutes from './routes/merchants';
@@ -172,6 +173,7 @@ app.get('/api/docs.json', (_req, res) => {
 
 // API Routes
 app.use('/api/keys', apiKeysRoutes);
+app.use('/api/subscriptions', subscriptionShareRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/risk-score', riskScoreRoutes);
 app.use('/api/simulation', simulationRoutes);
