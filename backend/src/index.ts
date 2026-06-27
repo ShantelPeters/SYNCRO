@@ -72,6 +72,7 @@ import { startChannelSettlementJob } from './jobs/channel-settlement-job';
 import { startJobAlertMonitor, stopJobAlertMonitor } from './jobs/job-alert-monitor';
 import giftCardLedgerRoutes from './routes/gift-card-ledger';
 import notificationDeadLetterRoutes from './routes/notification-dead-letter';
+import renewalDeadLetterRoutes from './routes/renewal-dead-letter';
 import telegramWebhookRoutes from './routes/telegram-webhook';
 import { telegramCommandService } from './services/telegram-command-service';
 import calendarRouter from './routes/calendar';
@@ -198,6 +199,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/key-rotation', keyRotationRoutes);
 app.use('/api/privacy', privacyRoutes);
 app.use('/api/notifications/dead-letter', notificationDeadLetterRoutes);
+app.use('/api/renewals/dead-letter', renewalDeadLetterRoutes);
 app.use('/api/exchange-rates', createExchangeRatesRouter(exchangeRateService));
 app.use('/api/gift-card-ledger', giftCardLedgerRoutes);
 app.use('/api/payments', authenticate, paymentsRoutes);
@@ -308,6 +310,16 @@ app.get('/api/admin/metrics/failed-items', createAdminLimiter(), adminAuth, asyn
   } catch (error) {
     logger.error('Error fetching failed items:', error);
     res.status(500).json({ error: 'Failed to fetch failed items' });
+  }
+});
+
+app.get('/api/admin/metrics/renewal-locks', createAdminLimiter(), adminAuth, async (_req, res) => {
+  try {
+    const metrics = await monitoringService.getRenewalLockMetrics();
+    res.json(metrics);
+  } catch (error) {
+    logger.error('Error fetching renewal lock metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch renewal lock metrics' });
   }
 });
 
