@@ -315,6 +315,16 @@ app.get('/api/admin/metrics/failed-items', createAdminLimiter(), adminAuth, asyn
   }
 });
 
+app.get('/api/admin/metrics/query-cache', createAdminLimiter(), adminAuth, async (_req, res) => {
+  try {
+    const metrics = await monitoringService.getQueryCacheMetrics();
+    res.json(metrics);
+  } catch (error) {
+    logger.error('Error fetching query cache metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch query cache metrics' });
+  }
+});
+
 app.get('/api/admin/metrics/renewal-locks', createAdminLimiter(), adminAuth, async (_req, res) => {
   try {
     const metrics = await monitoringService.getRenewalLockMetrics();

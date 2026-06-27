@@ -4,6 +4,7 @@ import { ExternalServiceClient, ServiceMetrics } from '../utils/external-service
 import { apiLatencyService, EndpointLatencyMetrics } from './api-latency-service';
 import { redisDistributedLock, LockMetricsSnapshot } from '../lib/redis-lock';
 import { renewalDeadLetterService } from './renewal-dead-letter-service';
+import { queryCacheService, QueryCacheMetrics } from './query-cache-service';
 import { normalizeToMonthlyAmount } from '@syncro/shared/subscription-math';
 
 // ─── Existing interfaces ────────────────────────────────────────────────────
@@ -684,6 +685,20 @@ export class MonitoringService {
             redis_locks: redisLocks,
             dead_letter: deadLetter,
             generated_at: new Date().toISOString(),
+        };
+    }
+
+    /**
+     * Query cache hit/miss metrics (Issue #941).
+     */
+    async getQueryCacheMetrics(): Promise<QueryCacheMetrics & { hit_rate_pct: number }> {
+        const metrics = await queryCacheService.getMetrics();
+        const total = metrics.hits + metrics.misses;
+        const hitRate = total > 0 ? parseFloat(((metrics.hits / total) * 100).toFixed(2)) : 0;
+
+        return {
+            ...metrics,
+            hit_rate_pct: hitRate,
         };
     }
 }
